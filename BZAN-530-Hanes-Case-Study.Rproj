@@ -12,7 +12,7 @@ Encoding: UTF-8
 RnwWeave: Sweave
 LaTeX: pdfLaTeX
 
-
+#install.packages("readxl")
 library(readxl)
 library(tidyverse)
 BLOCKGROUP <- read_excel("UT_blockgroup_data.xlsx")
@@ -23,20 +23,31 @@ channel41 <- BLOCKGROUP[ ,c(1,27,grep("channel41",colnames(BLOCKGROUP)),33)]
 channel45 <- BLOCKGROUP[ ,c(1,27,grep("channel45",colnames(BLOCKGROUP)),33)]
 channel46 <- BLOCKGROUP[ ,c(1,27,grep("channel46",colnames(BLOCKGROUP)),33)]
 
-#Obtain total sales for each DMA per channel
-dma_26 <- aggregate(channel26_sales_d~dma, data = channel26, FUN = sum)                       
-dma_41 <- aggregate(channel41_sales_d~dma, data = channel41, FUN = sum)
-dma_45 <- aggregate(channel45_sales_d~dma, data = channel45, FUN = sum)
-dma_46 <- aggregate(channel46_sales_d~dma, data = channel46, FUN = sum)
+#Obtain total sales for each DMA per channel and Category
+dma_26 <- aggregate(channel26_sales_d~dma+category, data = channel26, FUN = sum)                       
+dma_41 <- aggregate(channel41_sales_d~dma+category, data = channel41, FUN = sum)
+dma_45 <- aggregate(channel45_sales_d~dma+category, data = channel45, FUN = sum)
+dma_46 <- aggregate(channel46_sales_d~dma+category, data = channel46, FUN = sum)
+
+dma_26_cats <- dma_26 %>% arrange(dma,category)
+dma_41_cats <- dma_41 %>% arrange(dma,category)
+dma_45_cats <- dma_45 %>% arrange(dma,category)
+dma_46_cats <- dma_46 %>% arrange(dma,category)
 
 #Join DMA sales data frames to calculate total overall sales 
-df_list <- list(dma_26,dma_41,dma_45,dma_46)
-sales_agg <- df_list %>% reduce(full_join,by = "dma")
+df_list <- list(dma_26_cats,dma_41_cats,dma_45_cats,dma_46_cats)
+sales_agg <- df_list %>% reduce(full_join,by = c("dma","category"))
 
 #For loop so sum up sales for each row 
 for( i in 1:nrow(sales_agg)){
-sales_agg$total_sales[i] <- sum(sales_agg[i,2:5])
+sales_agg$total_sales[i] <- sum(sales_agg[i,3:6])
 }
 
 #The top 5 performing DMAs in terms of total sales
-sales_agg[order(sales_agg$total_sales,decreasing=TRUE)[1:5],c(1,6)]
+A <- subset(sales_agg,category == "category_a")
+Top_A <- A[order(A$total_sales,decreasing = TRUE)[1:5],]
+Top_A[,c(1,2,7)]
+
+B <- subset(sales_agg,category == "category_b")
+Top_B <- B[order(B$total_sales,decreasing = TRUE)[1:5],]
+Top_B[,c(1,2,7)]
