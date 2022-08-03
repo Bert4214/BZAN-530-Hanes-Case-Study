@@ -15,7 +15,49 @@ LaTeX: pdfLaTeX
 #install.packages("readxl")
 library(readxl)
 library(tidyverse)
+library(regclass)
 BLOCKGROUP <- read_excel("UT_blockgroup_data.xlsx")
+
+#############################
+#### Correlation Factors ####
+#############################
+
+DATA_A <- subset(BLOCKGROUP,category == "category_a")
+DATA_B <- subset(BLOCKGROUP,category == "category_b")
+
+for( i in 1:nrow(DATA_A) ){
+DATA_A$total_sales[i] <- sum(DATA_A[i,c(29:32)])
+}
+
+for( i in 1:nrow(DATA_B) ){
+  DATA_B$total_sales[i] <- sum(DATA_B[i,c(29:32)])
+}
+
+DATA_A_Factors <- DATA_A[,c(10:27,34)]
+DATA_B_Factors <- DATA_B[,c(10:27,34)]
+
+colnames(DATA_A)
+
+summary(lm(total_sales~gender_male_total_cnt+gender_female_total_cnt+ethnic_white_total_cnt,
+           data=DATA_A[which(DATA_A$dma == "New York NY"),]))
+
+summary(lm(total_sales~gender_male_total_cnt+gender_female_total_cnt+eth_blackafram_total_cnt,
+           data=DATA_A[which(DATA_A$dma == "New York NY"),]))
+
+summary(lm(total_sales~gender_male_total_cnt+gender_female_total_cnt+eth_amindian_alaskan_total_cnt,
+           data=DATA_A[which(DATA_A$dma == "New York NY"),]))
+
+summary(lm(total_sales~gender_male_total_cnt+gender_female_total_cnt+eth_asian_total_cnt,
+           data=DATA_A[which(DATA_A$dma == "New York NY"),]))
+
+summary(lm(total_sales~gender_male_total_cnt+gender_female_total_cnt+eth_hawaiian_othpac_total_cnt,
+           data=DATA_A[which(DATA_A$dma == "New York NY"),]))
+
+summary(lm(total_sales~.,data=DATA_A_Factors[which(DATA_A_Factors$dma == "New York NY"),]))
+
+############################
+#### Top 5 Sales Totals ####
+############################
 
 #Subset BLOCKGROUP into channels                       
 channel26 <- BLOCKGROUP[ ,c(1,27,grep("channel26",colnames(BLOCKGROUP)),33)] 
@@ -51,3 +93,83 @@ Top_A[,c(1,2,7)]
 B <- subset(sales_agg,category == "category_b")
 Top_B <- B[order(B$total_sales,decreasing = TRUE)[1:5],]
 Top_B[,c(1,2,7)]
+
+###############################################################################
+###### Most variation between sales in census groups for both categories ######
+###############################################################################
+
+BLOCKGROUP2 <- read_excel("UT_blockgroup_data.xlsx")
+
+#Subset BLOCKGROUP into channels                       
+channel26_2 <- BLOCKGROUP2[ ,c(1,27,grep("channel26",colnames(BLOCKGROUP2)),33)] 
+channel41_2 <- BLOCKGROUP2[ ,c(1,27,grep("channel41",colnames(BLOCKGROUP2)),33)]
+channel45_2 <- BLOCKGROUP2[ ,c(1,27,grep("channel45",colnames(BLOCKGROUP2)),33)]
+channel46_2 <- BLOCKGROUP2[ ,c(1,27,grep("channel46",colnames(BLOCKGROUP2)),33)]
+
+#Obtain total sales for each DMA per channel, category, and census blockgroup
+dma_26_2 <- aggregate(channel26_sales_d~dma+category+census_blockgroup, data = channel26_2, FUN = sum)                       
+dma_41_2 <- aggregate(channel41_sales_d~dma+category+census_blockgroup, data = channel41_2, FUN = sum)
+dma_45_2 <- aggregate(channel45_sales_d~dma+category+census_blockgroup, data = channel45_2, FUN = sum)
+dma_46_2 <- aggregate(channel46_sales_d~dma+category+census_blockgroup, data = channel46_2, FUN = sum)
+
+dma_26_cats_2 <- dma_26_2 %>% arrange(dma,category)
+dma_41_cats_2 <- dma_41_2 %>% arrange(dma,category)
+dma_45_cats_2 <- dma_45_2 %>% arrange(dma,category)
+dma_46_cats_2 <- dma_46_2 %>% arrange(dma,category)
+
+#Join DMA sales data frames to calculate total overall sales 
+df_list <- list(dma_26_cats_2,dma_41_cats_2,dma_45_cats_2,dma_46_cats_2)
+sales_agg_2 <- df_list %>% reduce(full_join,by = c("dma","category","census_blockgroup"))
+
+#For loop so sum up sales for each row 
+for( i in 1:nrow(sales_agg_2)){
+  sales_agg_2$total_sales[i] <- sum(sales_agg_2[i,4:7])
+}
+
+#The top 5 DMAs with the highest variation between census block groups for categories A and B 
+
+A_2 <- subset(sales_agg_2,category == "category_a") # Category A subgroup
+
+B_2 <- subset(sales_agg_2,category == "category_b") # Category B subgroup
+
+# Empty vectors for the for loops
+variation_A <- c()
+variation_B <- c()
+
+# For loop for variation between census blocks in category A 
+for( i in 1:length(unique(A_2$dma)) ){
+  
+  city <- unique(A_2$dma)[i] # Selects the city name associated with iteration i 
+  this_data <- A_2[which(A_2$dma == city),] # Subgroups data in A_2 with DMAs matching city
+  
+  variation_A[i] <- max(this_data$total_sales) - min(this_data$total_sales) #Calculate difference between max and min sales for census block groups 
+  
+}
+
+# For loop for variation between census blocks in category B
+for( i in 1:length(unique(B_2$dma)) ){
+  
+  city <- unique(B_2$dma)[i] # Selects the city name associated with iteration i
+  this_data <- B_2[which(B_2$dma == city),] # Subgroups data in A_2 with DMAs matching city
+  
+  variation_B[i] <- max(this_data$total_sales) - min(this_data$total_sales) #Calculate difference between max and min sales for census block groups
+  
+}
+
+# Order indexes of top 5 variations for A and B 
+order(variation_A,decreasing=TRUE)[1:5] 
+order(variation_B,decreasing=TRUE)[1:5]
+
+# Get the names of the top 5 DMAs cooresponding to top 5 variaiton indexes
+unique(A_2$dma)[order(variation_A,decreasing=TRUE)[1:5]]
+unique(B_2$dma)[order(variation_B,decreasing=TRUE)[1:5]]
+
+#Creating result data frames 
+city_A <- unique(A_2$dma)[order(variation_A,decreasing=TRUE)[1:5]] # Top 5 DMA names
+vary_A <- sort(variation_A,decreasing=TRUE)[1:5] # Top 5 variation values 
+top_var_A <- data.frame(city_A,vary_A) # Creation of new data frame
+
+city_B <- unique(B_2$dma)[order(variation_B,decreasing=TRUE)[1:5]] # Top 5 DMA names
+vary_B <- sort(variation_B,decreasing=TRUE)[1:5] # Top 5 variation values
+top_var_B <- data.frame(city_B,vary_B) # Creation of new data frame
+
